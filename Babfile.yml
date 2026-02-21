@@ -1,0 +1,86 @@
+tasks:
+  build:
+    desc: Build the binary
+    run:
+      - cmd: go build -ldflags "-s -w -X main.version=dev -X main.commit=$(git rev-parse --short HEAD) -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o hdf .
+
+  install:
+    desc: Install the binary
+    run:
+      - cmd: go install -ldflags "-s -w -X main.version=dev -X main.commit=$(git rev-parse --short HEAD) -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" .
+
+  dev:
+    desc: Run in development mode
+    run:
+      - cmd: go run -ldflags "-X main.version=dev -X main.commit=$(git rev-parse --short HEAD) -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" .
+
+  deps:
+    desc: Tidy dependencies
+    run:
+      - cmd: go mod tidy
+
+  clean:
+    desc: Clean build artifacts
+    run:
+      - cmd: rm -f hdf hdf.exe
+      - cmd: rm -rf dist/
+      - cmd: rm -rf completions/
+
+  lint:
+    desc: Run linter
+    run:
+      - cmd: golangci-lint run ./...
+
+  lint:fix:
+    desc: Run linter with auto-fix
+    run:
+      - cmd: golangci-lint run --fix ./...
+
+  format:
+    desc: Format code
+    run:
+      - cmd: gofumpt -w .
+      - cmd: goimports -w .
+
+  format:check:
+    desc: Check formatting
+    run:
+      - cmd: gofumpt -d . | head -20
+
+  test:
+    desc: Run tests
+    run:
+      - cmd: go test ./...
+
+  test:race:
+    desc: Run tests with race detector
+    run:
+      - cmd: go test -race ./...
+
+  check:
+    desc: Run all checks
+    deps:
+      - lint
+      - format:check
+      - test:race
+
+  fix:
+    desc: Fix all issues
+    deps:
+      - lint:fix
+      - format
+
+  hooks:install:
+    desc: Install git hooks via lefthook
+    run:
+      - cmd: lefthook install
+
+  hooks:uninstall:
+    desc: Uninstall git hooks
+    run:
+      - cmd: lefthook uninstall
+
+  snapshot:
+    desc: Build snapshot release
+    run:
+      - cmd: goreleaser release --snapshot --clean

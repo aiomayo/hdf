@@ -1,0 +1,56 @@
+min_version: 1.9.0
+
+rc: |
+  export PATH="$HOME/go/bin:$PATH"
+
+output:
+  - meta
+  - success
+  - failure
+  - summary
+
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      glob: "*.go"
+      run: gofumpt -w {staged_files} && goimports -w {staged_files}
+      stage_fixed: true
+      fail_text: "Formatting failed"
+
+    vet:
+      glob: "*.go"
+      run: go vet ./...
+      fail_text: "Go vet failed"
+
+    tidy:
+      glob: "*.go"
+      run: go mod tidy && git diff --exit-code go.mod go.sum
+      fail_text: "go.mod is not tidy. Run: go mod tidy"
+
+    lint:
+      glob: "*.go"
+      run: golangci-lint run --config=".golangci.yml" --new --timeout=5m
+      fail_text: "Linting failed. Run: golangci-lint run --fix"
+
+    test:
+      glob: "*.go"
+      run: go test -race ./...
+      fail_text: "Tests failed"
+
+commit-msg:
+  commands:
+    commitlint:
+      run: go tool commitlint lint --msg {1}
+
+pre-push:
+  commands:
+    lint:
+      glob: "*.go"
+      run: golangci-lint run --config=".golangci.yml" --timeout=5m
+      fail_text: "Linting failed. Run: golangci-lint run --fix"
+
+    test:
+      glob: "*.go"
+      run: go test -v -race ./...
+      fail_text: "Tests failed. Run: go test -v -race ./..."

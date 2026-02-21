@@ -1,0 +1,456 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+report_sizes: true
+
+project_name: hdf
+
+env:
+  - CGO_ENABLED=0
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod download
+    - ./scripts/completions.sh
+
+gomod:
+  proxy: true
+
+builds:
+  - id: default
+    binary: hdf
+    main: .
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+      - arm
+    goarm:
+      - "7"
+    goamd64:
+      - v1
+    ignore:
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.FullCommit}} -X main.date={{.CommitDate}}
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+universal_binaries:
+  - id: hdf-universal
+    ids:
+      - default
+    replace: false
+    name_template: 'hdf'
+
+archives:
+  - id: default
+    builds_info:
+      mode: 0755
+      mtime: "{{ .CommitDate }}"
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_
+      {{- if eq .Os "windows" }}Windows
+      {{- else if eq .Os "darwin" }}macOS
+      {{- else }}{{ title .Os }}{{ end }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else if eq .Arch "all" }}universal
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    files:
+      - completions/*
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+source:
+  enabled: true
+
+signs:
+  - id: checksum-sign
+    cmd: cosign
+    certificate: "${artifact}.pem"
+    artifacts: checksum
+    output: true
+    args:
+      - sign-blob
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes"
+
+release:
+  github:
+    owner: aiomayo
+    name: hdf
+  mode: append
+
+#nfpms:
+#  - id: packages
+#    package_name: hdf
+#    vendor: aiomayo
+#    homepage: https://github.com/aiomayo/hdf
+#    maintainer: Sebastian Stepper <sebastian-stepper@gmx.de>
+#    description: To Assacinate Annoying processes
+#    license: MIT
+#    section: devel
+#    priority: optional
+#
+#    formats:
+#      - deb
+#      - rpm
+#      - apk
+#      - archlinux
+#
+#    bindir: /usr/bin
+#
+#    contents:
+#      - src: ./completions/hdf.bash
+#        dst: /usr/share/bash-completion/completions/hdf
+#        file_info:
+#          mode: 0644
+#      - src: ./completions/hdf.zsh
+#        dst: /usr/share/zsh/vendor-completions/_hdf
+#        file_info:
+#          mode: 0644
+#      - src: ./completions/hdf.fish
+#        dst: /usr/share/fish/vendor_completions.d/hdf.fish
+#        file_info:
+#          mode: 0644
+#
+#    scripts:
+#      postinstall: "scripts/postinstall.sh"
+#      preremove: "scripts/preremove.sh"
+#
+#    overrides:
+#      deb:
+#        provides:
+#          - hdf
+#        conflicts:
+#          - hdf-bin
+#        replaces:
+#          - hdf-bin
+#      rpm:
+#        provides:
+#          - hdf
+#        conflicts:
+#          - hdf-bin
+#        replaces:
+#          - hdf-bin
+#      apk:
+#        provides:
+#          - hdf
+#        conflicts:
+#          - hdf-bin
+#        replaces:
+#          - hdf-bin
+#      archlinux:
+#        provides:
+#          - hdf
+#        conflicts:
+#          - hdf-bin
+#        replaces:
+#          - hdf-bin
+
+#brews:
+#  - name: hdf
+#    repository:
+#      owner: aiomayo
+#      name: homebrew-tap
+#      branch: main
+#      token: "{{ .Env.PAT_TOKEN }}"
+#    commit_author:
+#      name: goreleaserbot
+#      email: "[email protected]"
+#    commit_msg_template: "chore: update {{ .ProjectName }} to {{ .Tag }}"
+#    homepage: "https://github.com/aiomayo/hdf"
+#    description: "To Assacinate Annoying processes"
+#    license: "MIT"
+#    directory: Formula
+#    install: |
+#      bin.install "hdf"
+#      bash_completion.install "completions/hdf.bash" => "hdf"
+#      zsh_completion.install "completions/hdf.zsh" => "_hdf"
+#      fish_completion.install "completions/hdf.fish"
+#    test: |
+#      system "#{bin}/hdf", "--version"
+
+#homebrew_casks:
+#  - name: hdf
+#    repository:
+#      owner: aiomayo
+#      name: homebrew-tap
+#      branch: main
+#      token: "{{ .Env.PAT_TOKEN }}"
+#    commit_author:
+#      name: goreleaserbot
+#      email: "[email protected]"
+#    commit_msg_template: "chore: update {{ .ProjectName }} to {{ .Tag }}"
+#    homepage: "https://github.com/aiomayo/hdf"
+#    description: "To Assacinate Annoying processes"
+#    license: "MIT"
+#    directory: Casks
+#    url:
+#      verified: github.com/aiomayo/hdf
+#    binaries:
+#      - hdf
+#    completions:
+#      bash: completions/hdf.bash
+#      zsh: completions/hdf.zsh
+#      fish: completions/hdf.fish
+#    hooks:
+#      post:
+#        install: |
+#          if OS.mac?
+#            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/hdf"]
+#          end
+#
+#  - name: "hdf@{{ .Major }}.{{ .Minor }}"
+#    repository:
+#      owner: aiomayo
+#      name: homebrew-tap
+#      branch: main
+#      token: "{{ .Env.PAT_TOKEN }}"
+#    commit_author:
+#      name: goreleaserbot
+#      email: "[email protected]"
+#    commit_msg_template: "chore: add {{ .ProjectName }}@{{ .Major }}.{{ .Minor }} ({{ .Tag }})"
+#    homepage: "https://github.com/aiomayo/hdf"
+#    description: "To Assacinate Annoying processes (v{{ .Major }}.{{ .Minor }}.x)"
+#    license: "MIT"
+#    directory: Casks
+#    url:
+#      verified: github.com/aiomayo/hdf
+#    binaries:
+#      - hdf
+#    completions:
+#      bash: completions/hdf.bash
+#      zsh: completions/hdf.zsh
+#      fish: completions/hdf.fish
+#    hooks:
+#      post:
+#        install: |
+#          if OS.mac?
+#            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/hdf"]
+#          end
+
+#scoops:
+#  - name: hdf
+#    repository:
+#      owner: aiomayo
+#      name: scoop-bucket
+#      branch: main
+#      token: "{{ .Env.PAT_TOKEN }}"
+#
+#    commit_author:
+#      name: goreleaserbot
+#      email: "[email protected]"
+#
+#    commit_msg_template: "chore: update {{ .ProjectName }} to {{ .Tag }}"
+#
+#    homepage: "https://github.com/aiomayo/hdf"
+#    description: "To Assacinate Annoying processes"
+#    license: MIT
+#
+#    shortcuts:
+#      - ["hdf.exe", "hdf"]
+
+#chocolateys:
+#  - name: hdf
+#    ids:
+#      - default
+#    owners: aiomayo
+#    authors: Sebastian Stepper
+#    title: hdf - To Assacinate Annoying processes
+#
+#    project_url: https://github.com/aiomayo/hdf
+#    project_source_url: https://github.com/aiomayo/hdf
+#    package_source_url: https://github.com/aiomayo/hdf
+#    license_url: https://github.com/aiomayo/hdf/blob/main/LICENSE
+#    docs_url: https://github.com/aiomayo/hdf#readme
+#    bug_tracker_url: https://github.com/aiomayo/hdf/issues
+#
+#    copyright: 2025 aiomayo
+#    require_license_acceptance: false
+#
+#    tags: "cli process-killer productivity developer-tools"
+#    summary: To Assacinate Annoying processes
+#    description: hdf is a smart process killer. Kill processes by port, name, PID, or pattern.
+#
+#    release_notes: "https://github.com/aiomayo/hdf/releases/tag/{{ .Tag }}"
+#
+#    api_key: "{{ .Env.CHOCOLATEY_API_KEY }}"
+#    source_repo: "https://push.chocolatey.org/"
+#    goamd64: v1
+
+#snapcrafts:
+#  - name: hdf
+#    title: hdf
+#
+#    summary: To Assacinate Annoying processes
+#
+#    description: hdf is a smart process killer. Kill processes by port, name, PID, or pattern.
+#
+#    publish: true
+#    grade: stable
+#    confinement: strict
+#    base: core22
+#
+#    license: MIT
+#
+#    apps:
+#      hdf:
+#        command: hdf
+#        plugs:
+#          - home
+#          - network
+#
+#    channel_templates:
+#      - stable
+
+#aurs:
+#  - name: hdf-bin
+#    homepage: "https://github.com/aiomayo/hdf"
+#    description: "To Assacinate Annoying processes"
+#    maintainers:
+#      - "Sebastian Stepper <sebastian-stepper@gmx.de>"
+#    license: "MIT"
+#    private_key: "{{ .Env.AUR_SSH_PRIVATE_KEY }}"
+#    git_url: "ssh://aur@aur.archlinux.org/hdf-bin.git"
+#    optdepends:
+#      - "bash-completion: for bash completions"
+#      - "zsh: for zsh completions"
+#      - "fish: for fish completions"
+#
+#    commit_author:
+#      name: goreleaserbot
+#      email: "[email protected]"
+#
+#    commit_msg_template: "upgpkg: {{ .ProjectName }} {{ .Tag }}"
+#
+#    package: |-
+#      # Binary
+#      install -Dm755 "./hdf" "${pkgdir}/usr/bin/hdf"
+#
+#      # Shell completions
+#      install -Dm644 "./completions/hdf.bash" "${pkgdir}/usr/share/bash-completion/completions/hdf"
+#      install -Dm644 "./completions/hdf.zsh" "${pkgdir}/usr/share/zsh/site-functions/_hdf"
+#      install -Dm644 "./completions/hdf.fish" "${pkgdir}/usr/share/fish/vendor_completions.d/hdf.fish"
+
+#aur_sources:
+#  - name: hdf
+#    homepage: "https://github.com/aiomayo/hdf"
+#    description: "To Assacinate Annoying processes"
+#    maintainers:
+#      - "Sebastian Stepper <sebastian-stepper@gmx.de>"
+#    license: "MIT"
+#    private_key: "{{ .Env.AUR_SSH_PRIVATE_KEY }}"
+#    git_url: "ssh://aur@aur.archlinux.org/hdf.git"
+#    optdepends:
+#      - "bash-completion: for bash completions"
+#      - "zsh: for zsh completions"
+#      - "fish: for fish completions"
+#
+#    commit_author:
+#      name: goreleaserbot
+#      email: "[email protected]"
+#    commit_msg_template: "upgpkg: {{ .ProjectName }} {{ .Tag }}"
+#    url_template: "https://github.com/aiomayo/hdf/releases/download/{{ .Tag }}/{{ .ProjectName }}-{{ .Version }}.tar.gz"
+#    provides:
+#      - hdf
+#    conflicts:
+#      - hdf-bin
+#    depends:
+#      - glibc
+#    makedepends:
+#      - go
+#      - git
+#    build: |-
+#      export CGO_CPPFLAGS="${CPPFLAGS}"
+#      export CGO_CFLAGS="${CFLAGS}"
+#      export CGO_CXXFLAGS="${CXXFLAGS}"
+#      export CGO_LDFLAGS="${LDFLAGS}"
+#      export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
+#
+#      go build \
+#        -ldflags="-s -w -buildid='' -linkmode=external \
+#          -X main.version=${pkgver} \
+#          -X main.commit={{ .Commit }} \
+#          -X main.date={{ .CommitDate }}" \
+#        -o hdf .
+#
+#      # Generate shell completions
+#      mkdir -p completions
+#      ./hdf --completion bash > completions/hdf.bash
+#      ./hdf --completion zsh > completions/hdf.zsh
+#      ./hdf --completion fish > completions/hdf.fish
+#
+#    package: |-
+#      # Binary
+#      install -Dm755 ./hdf "${pkgdir}/usr/bin/hdf"
+#
+#      # Shell completions
+#      install -Dm644 ./completions/hdf.bash "${pkgdir}/usr/share/bash-completion/completions/hdf"
+#      install -Dm644 ./completions/hdf.zsh "${pkgdir}/usr/share/zsh/site-functions/_hdf"
+#      install -Dm644 ./completions/hdf.fish "${pkgdir}/usr/share/fish/vendor_completions.d/hdf.fish"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  abbrev: 7
+  format: "* {{ .SHA }} {{ .Message }}{{ if .Logins }} ({{ .Logins | englishJoin }}){{ end }}"
+  groups:
+    - title: "Breaking Changes"
+      regexp: '^.*!:'
+      order: 0
+    - title: "Features"
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+'
+      order: 1
+    - title: "Bug Fixes"
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+'
+      order: 2
+    - title: "Performance"
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+'
+      order: 3
+    - title: "Refactoring"
+      regexp: '^.*?refactor(\([[:word:]]+\))??!?:.+'
+      order: 4
+    - title: "Documentation"
+      regexp: '^.*?docs(\([[:word:]]+\))??!?:.+'
+      order: 5
+    - title: "Tests"
+      regexp: '^.*?test(\([[:word:]]+\))??!?:.+'
+      order: 6
+    - title: "Build & CI"
+      regexp: '^.*?(build|ci)(\([[:word:]]+\))??!?:.+'
+      order: 7
+    - title: "Other Changes"
+      regexp: '^.*?(style|revert)(\([[:word:]]+\))??!?:.+'
+      order: 999
+  filters:
+    exclude:
+      - '^.*?chore(\([[:word:]]+\))??!?:.+'
+      - '^Merge'
+      - '^merge'
+
+metadata:
+  mod_timestamp: "{{ .CommitTimestamp }}"

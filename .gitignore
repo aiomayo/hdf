@@ -1,0 +1,21 @@
+# Binaries
+hdf
+hdf.exe
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated
+completions/
+
+# Go
+vendor/
