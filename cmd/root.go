@@ -95,7 +95,7 @@ func newRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "hdf [query]",
 		Short:   "Kill processes by port, name, PID, or pattern",
-		Long:    "hdf — a smart process killer. Pass a port number, process name, PID, or glob pattern.",
+		Long:    fmt.Sprintf("hdf — a smart process killer. Pass a port number, process name, PID, or glob pattern.\n\nConfig: %s", config.Path()),
 		Version: versionString,
 		Args:    cobra.MaximumNArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {

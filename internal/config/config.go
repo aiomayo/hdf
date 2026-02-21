@@ -26,6 +26,10 @@ func configPath() string {
 	return filepath.Join(configDir(), "config.toml")
 }
 
+func Path() string {
+	return configPath()
+}
+
 func Load() (*Config, error) {
 	cfg := defaultConfig
 
