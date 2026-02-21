@@ -19,6 +19,7 @@ type Config struct {
 	Aliases         map[string]string `mapstructure:"aliases"`
 	DefaultForce    bool              `mapstructure:"default_force"`
 	DefaultVerbose  bool              `mapstructure:"default_verbose"`
+	DefaultEditor   string            `mapstructure:"default_editor"`
 }
 
 func Path() string {
@@ -143,6 +144,13 @@ func ParseValue(f *Field, raw string) (any, error) {
 		return strconv.ParseBool(raw)
 	case String:
 		return raw, nil
+	case Select:
+		for _, opt := range f.Options {
+			if raw == opt {
+				return raw, nil
+			}
+		}
+		return nil, fmt.Errorf("invalid option %q for %s (valid: %s)", raw, f.Key, strings.Join(f.Options, ", "))
 	case Duration:
 		return time.ParseDuration(raw)
 	case StringSlice:
@@ -162,7 +170,7 @@ func FormatValue(f *Field, val any) string {
 	switch f.Kind {
 	case Bool:
 		return strconv.FormatBool(val.(bool))
-	case String:
+	case String, Select:
 		return fmt.Sprintf("%q", val.(string))
 	case Duration:
 		return fmt.Sprintf("%q", val.(time.Duration).String())

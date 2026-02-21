@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/aiomayo/hdf/internal/config"
+	"github.com/aiomayo/hdf/internal/ui"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
@@ -99,7 +101,7 @@ func formatShow(cfg *config.Config) string {
 			if f.Kind == config.StringMap {
 				fmt.Fprintf(&b, "%s\n", formatted)
 			} else {
-				fmt.Fprintf(&b, "%-17s = %-10s  # %s\n", f.Key, formatted, f.Desc)
+				fmt.Fprintf(&b, "%-20s = %-10s  # %s\n", f.DisplayName(), formatted, f.Desc)
 			}
 		}
 	}
@@ -110,19 +112,35 @@ func formatShow(cfg *config.Config) string {
 func newConfigEditCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "edit",
-		Short: "Open config in editor",
+		Short: "Open config editor",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			editor := os.Getenv("VISUAL")
-			if editor == "" {
-				editor = os.Getenv("EDITOR")
-			}
-			if editor == "" {
-				editor = "vi"
+			cfg, err := config.Load()
+			if err != nil {
+				return err
 			}
 
-			if _, err := config.Load(); err != nil {
-				return err
+			editor := cfg.DefaultEditor
+			if editor == "" {
+				editor, err = pickEditor()
+				if err != nil {
+					return err
+				}
+				cfg.DefaultEditor = editor
+				if err := config.Save(cfg); err != nil {
+					return err
+				}
+			}
+
+			if editor == "tui" {
+				modified, err := ui.EditConfig(cfg)
+				if err != nil {
+					return err
+				}
+				if modified {
+					return config.Save(cfg)
+				}
+				return nil
 			}
 
 			c := exec.Command(editor, config.Path())
@@ -132,6 +150,38 @@ func newConfigEditCmd() *cobra.Command {
 			return c.Run()
 		},
 	}
+}
+
+func pickEditor() (string, error) {
+	f := config.LookupField("default_editor")
+
+	var options []huh.Option[string]
+	for _, opt := range f.Options {
+		if opt == "" {
+			continue
+		}
+		if opt == "tui" {
+			options = append(options, huh.NewOption("Built-in TUI", opt))
+			continue
+		}
+		if _, err := exec.LookPath(opt); err == nil {
+			options = append(options, huh.NewOption(opt, opt))
+		}
+	}
+
+	var choice string
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Choose default config editor").
+				Options(options...).
+				Value(&choice),
+		),
+	)
+	if err := form.Run(); err != nil {
+		return "", err
+	}
+	return choice, nil
 }
 
 func newConfigResetCmd() *cobra.Command {
