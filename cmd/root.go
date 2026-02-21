@@ -123,6 +123,7 @@ func newRootCmd() *cobra.Command {
 	}
 
 	cmd.CompletionOptions.DisableDefaultCmd = true
+	cmd.AddCommand(newConfigCmd())
 
 	cmd.Flags().Uint32VarP(&f.port, "port", "p", 0, "kill by port number")
 	cmd.Flags().StringVarP(&f.name, "name", "n", "", "kill by process name")
