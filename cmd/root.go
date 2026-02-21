@@ -98,6 +98,9 @@ func newRootCmd() *cobra.Command {
 			if f.completion != "" {
 				return runCompletion(cmd, f.completion)
 			}
+			if len(args) == 0 && !hasQueryFlags(f) {
+				return cmd.Help()
+			}
 			return run(f, args)
 		},
 		SilenceUsage:  true,
@@ -125,6 +128,10 @@ func newRootCmd() *cobra.Command {
 	cmd.PersistentFlags().BoolVarP(&f.quiet, "quiet", "q", false, "suppress output")
 
 	return cmd
+}
+
+func hasQueryFlags(f *flags) bool {
+	return f.port > 0 || f.name != "" || f.pid > 0 || f.user != ""
 }
 
 func run(f *flags, args []string) error {
