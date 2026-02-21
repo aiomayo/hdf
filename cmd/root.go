@@ -15,13 +15,18 @@ import (
 	"github.com/aiomayo/hdf/internal/killer"
 	"github.com/aiomayo/hdf/internal/process"
 	"github.com/aiomayo/hdf/internal/ui"
+	"github.com/aiomayo/hdf/internal/update"
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 )
 
-var versionString = "dev"
+var (
+	versionString = "dev"
+	rawVersion    = "dev"
+)
 
 func SetVersionInfo(version, commit, date string) {
+	rawVersion = version
 	versionString = version
 	if commit != "none" {
 		versionString = fmt.Sprintf("%s\n  commit: %s\n  built:  %s", version, commit, date)
@@ -58,8 +63,18 @@ func Execute() int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
+	update.StartBackgroundRefresh(rawVersion)
+
 	rootCmd := newRootCmd()
-	if err := rootCmd.ExecuteContext(ctx); err != nil {
+	err := rootCmd.ExecuteContext(ctx)
+
+	if info := update.CheckCached(rawVersion); info != nil {
+		log.Warn("A new version of hdf is available",
+			"current", info.CurrentVersion,
+			"latest", info.LatestVersion)
+	}
+
+	if err != nil {
 		var ee *exitError
 		if errors.As(err, &ee) {
 			log.Error(ee.message)
