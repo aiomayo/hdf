@@ -22,6 +22,12 @@ To install a specific version:
 curl -sSfL https://raw.githubusercontent.com/aiomayo/hdf/main/install.sh | sh -s -- v0.0.1
 ```
 
+### Install script for Windows (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/aiomayo/hdf/main/install.ps1 | iex
+```
+
 ### Go
 
 ```sh
