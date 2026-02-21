@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -186,11 +187,16 @@ func FormatValue(f *Field, val any) string {
 		if len(m) == 0 {
 			return "(none)"
 		}
-		var lines []string
-		for k, v := range m {
-			lines = append(lines, fmt.Sprintf("  %s = %q", k, v))
+		keys := make([]string, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
 		}
-		return strings.Join(lines, "\n")
+		sort.Strings(keys)
+		parts := make([]string, 0, len(m))
+		for _, k := range keys {
+			parts = append(parts, fmt.Sprintf("%s=%q", k, m[k]))
+		}
+		return strings.Join(parts, ", ")
 	default:
 		return fmt.Sprintf("%v", val)
 	}

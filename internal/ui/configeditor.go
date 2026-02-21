@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -32,7 +33,7 @@ var (
 
 type configEditor struct {
 	cfg       *config.Config
-	fields    []config.Field
+	fields    []*config.Field
 	filtered  []int
 	cursor    int
 	search    textinput.Model
@@ -58,14 +59,6 @@ func EditConfig(cfg *config.Config) (bool, error) {
 }
 
 func newConfigEditor(cfg *config.Config) configEditor {
-	var fields []config.Field
-	for _, f := range config.Schema {
-		switch f.Kind {
-		case config.Bool, config.String, config.Select, config.Duration:
-			fields = append(fields, f)
-		}
-	}
-
 	search := textinput.New()
 	search.Placeholder = "Search settings..."
 	search.Prompt = "⌕ "
@@ -73,7 +66,12 @@ func newConfigEditor(cfg *config.Config) configEditor {
 	search.Width = 74
 
 	edit := textinput.New()
-	edit.CharLimit = 128
+	edit.CharLimit = 256
+
+	var fields []*config.Field
+	for i := range config.Schema {
+		fields = append(fields, &config.Schema[i])
+	}
 
 	m := configEditor{
 		cfg:       cfg,
@@ -114,6 +112,13 @@ func (m configEditor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m configEditor) currentField() *config.Field {
+	if len(m.filtered) == 0 || m.cursor < 0 || m.cursor >= len(m.filtered) {
+		return nil
+	}
+	return m.fields[m.filtered[m.cursor]]
+}
+
 func (m configEditor) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
@@ -145,10 +150,10 @@ func (m configEditor) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, textinput.Blink
 
 	case " ":
-		if len(m.filtered) == 0 {
+		f := m.currentField()
+		if f == nil {
 			break
 		}
-		f := m.fields[m.filtered[m.cursor]]
 		switch f.Kind {
 		case config.Bool:
 			val, _ := config.GetValue(m.cfg, f.Key)
@@ -166,17 +171,10 @@ func (m configEditor) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			_ = config.SetValue(m.cfg, f.Key, next)
 			m.dirty = true
-		case config.String, config.Duration:
+		default:
 			m.editing = true
 			m.editErr = ""
-			val, _ := config.GetValue(m.cfg, f.Key)
-			var s string
-			if f.Kind == config.Duration {
-				s = val.(time.Duration).String()
-			} else {
-				s = val.(string)
-			}
-			m.editInput.SetValue(s)
+			m.editInput.SetValue(formatEditable(m.cfg, f))
 			m.editInput.Focus()
 			m.editInput.CursorEnd()
 			return m, textinput.Blink
@@ -213,14 +211,9 @@ func (m configEditor) handleEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.editInput.Blur()
 		return m, nil
 	case "enter":
-		f := m.fields[m.filtered[m.cursor]]
+		f := m.currentField()
 		raw := m.editInput.Value()
-		val, err := config.ParseValue(&f, raw)
-		if err != nil {
-			m.editErr = err.Error()
-			return m, nil
-		}
-		if err := config.SetValue(m.cfg, f.Key, val); err != nil {
+		if err := parseAndSet(m.cfg, f, raw); err != nil {
 			m.editErr = err.Error()
 			return m, nil
 		}
@@ -272,10 +265,10 @@ func (m configEditor) View() string {
 	active := !m.searching
 	for i, idx := range m.filtered {
 		f := m.fields[idx]
-		val, _ := config.GetValue(m.cfg, f.Key)
-		formatted := config.FormatValue(&f, val)
-
 		isCursor := active && i == m.cursor
+
+		val, _ := config.GetValue(m.cfg, f.Key)
+		formatted := config.FormatValue(f, val)
 
 		prefix := "  "
 		if isCursor {
@@ -314,4 +307,68 @@ func (m configEditor) View() string {
 	}
 
 	return b.String()
+}
+
+func formatEditable(cfg *config.Config, f *config.Field) string {
+	val, _ := config.GetValue(cfg, f.Key)
+	switch f.Kind {
+	case config.String:
+		return val.(string)
+	case config.Duration:
+		return val.(time.Duration).String()
+	case config.StringSlice:
+		return strings.Join(val.([]string), ", ")
+	case config.StringMap:
+		m := val.(map[string]string)
+		names := make([]string, 0, len(m))
+		for k := range m {
+			names = append(names, k)
+		}
+		sort.Strings(names)
+		parts := make([]string, 0, len(m))
+		for _, k := range names {
+			parts = append(parts, k+"="+m[k])
+		}
+		return strings.Join(parts, ", ")
+	default:
+		return fmt.Sprintf("%v", val)
+	}
+}
+
+func parseAndSet(cfg *config.Config, f *config.Field, raw string) error {
+	switch f.Kind {
+	case config.StringSlice:
+		parts := strings.Split(raw, ",")
+		result := make([]string, 0, len(parts))
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				result = append(result, p)
+			}
+		}
+		return config.SetValue(cfg, f.Key, result)
+	case config.StringMap:
+		m := make(map[string]string)
+		if strings.TrimSpace(raw) != "" {
+			parts := strings.Split(raw, ",")
+			for _, p := range parts {
+				p = strings.TrimSpace(p)
+				if p == "" {
+					continue
+				}
+				kv := strings.SplitN(p, "=", 2)
+				if len(kv) != 2 {
+					return fmt.Errorf("invalid format %q, use name=value", p)
+				}
+				m[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+			}
+		}
+		return config.SetValue(cfg, f.Key, m)
+	default:
+		val, err := config.ParseValue(f, raw)
+		if err != nil {
+			return err
+		}
+		return config.SetValue(cfg, f.Key, val)
+	}
 }
