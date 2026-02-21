@@ -29,6 +29,8 @@ builds:
       - amd64
       - arm64
       - arm
+      - "386"
+      - riscv64
     goarm:
       - "7"
     goamd64:
@@ -38,6 +40,12 @@ builds:
         goarch: arm
       - goos: windows
         goarch: arm64
+      - goos: windows
+        goarch: riscv64
+      - goos: darwin
+        goarch: "386"
+      - goos: darwin
+        goarch: riscv64
     flags:
       - -trimpath
     ldflags:
@@ -101,72 +109,42 @@ release:
     name: hdf
   mode: append
 
-#nfpms:
-#  - id: packages
-#    package_name: hdf
-#    vendor: aiomayo
-#    homepage: https://github.com/aiomayo/hdf
-#    maintainer: Sebastian Stepper <sebastian-stepper@gmx.de>
-#    description: To Assacinate Annoying processes
-#    license: MIT
-#    section: devel
-#    priority: optional
-#
-#    formats:
-#      - deb
-#      - rpm
-#      - apk
-#      - archlinux
-#
-#    bindir: /usr/bin
-#
-#    contents:
-#      - src: ./completions/hdf.bash
-#        dst: /usr/share/bash-completion/completions/hdf
-#        file_info:
-#          mode: 0644
-#      - src: ./completions/hdf.zsh
-#        dst: /usr/share/zsh/vendor-completions/_hdf
-#        file_info:
-#          mode: 0644
-#      - src: ./completions/hdf.fish
-#        dst: /usr/share/fish/vendor_completions.d/hdf.fish
-#        file_info:
-#          mode: 0644
-#
-#    scripts:
-#      postinstall: "scripts/postinstall.sh"
-#      preremove: "scripts/preremove.sh"
-#
-#    overrides:
-#      deb:
-#        provides:
-#          - hdf
-#        conflicts:
-#          - hdf-bin
-#        replaces:
-#          - hdf-bin
-#      rpm:
-#        provides:
-#          - hdf
-#        conflicts:
-#          - hdf-bin
-#        replaces:
-#          - hdf-bin
-#      apk:
-#        provides:
-#          - hdf
-#        conflicts:
-#          - hdf-bin
-#        replaces:
-#          - hdf-bin
-#      archlinux:
-#        provides:
-#          - hdf
-#        conflicts:
-#          - hdf-bin
-#        replaces:
-#          - hdf-bin
+nfpms:
+  - id: packages
+    package_name: hdf
+    vendor: aiomayo
+    homepage: https://github.com/aiomayo/hdf
+    maintainer: Sebastian Stepper <sebastian-stepper@gmx.de>
+    description: To Assacinate Annoying processes
+    license: MIT
+    section: devel
+    priority: optional
+
+    formats:
+      - deb
+      - rpm
+      - apk
+      - archlinux
+
+    bindir: /usr/bin
+
+    contents:
+      - src: ./completions/hdf.bash
+        dst: /usr/share/bash-completion/completions/hdf
+        file_info:
+          mode: 0644
+      - src: ./completions/hdf.zsh
+        dst: /usr/share/zsh/vendor-completions/_hdf
+        file_info:
+          mode: 0644
+      - src: ./completions/hdf.fish
+        dst: /usr/share/fish/vendor_completions.d/hdf.fish
+        file_info:
+          mode: 0644
+
+    scripts:
+      postinstall: "scripts/postinstall.sh"
+      preremove: "scripts/preremove.sh"
 
 #brews:
 #  - name: hdf
